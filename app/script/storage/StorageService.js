@@ -399,6 +399,10 @@ z.storage.StorageService = class StorageService {
    * @returns {Promise} Resolves with the primary key of the persisted object
    */
   save(store_name, primary_key, entity) {
+    if (!entity) {
+      throw Error('Saving undefined values is forbidden.');
+    }
+
     return this.db[store_name].put(entity, primary_key)
       .catch((error) => {
         this.logger.error(`Failed to put '${primary_key}' into store '${store_name}'`, error);
