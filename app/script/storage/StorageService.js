@@ -400,7 +400,7 @@ z.storage.StorageService = class StorageService {
    */
   save(store_name, primary_key, entity) {
     if (!entity) {
-      throw Error('Saving undefined values is forbidden.');
+      throw new z.storage.StorageError('Value is undefined');
     }
 
     return this.db[store_name].put(entity, primary_key)
