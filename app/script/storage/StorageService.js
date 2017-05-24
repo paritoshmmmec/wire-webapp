@@ -400,7 +400,7 @@ z.storage.StorageService = class StorageService {
    */
   save(store_name, primary_key, entity) {
     if (!entity) {
-      throw new z.storage.StorageError('Value is undefined');
+      return Promise.reject(new z.storage.StorageError(z.storage.StorageError.TYPE.NO_DATA));
     }
 
     return this.db[store_name].put(entity, primary_key)
