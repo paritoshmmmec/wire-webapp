@@ -332,7 +332,10 @@ z.entity.Conversation = class Conversation {
   add_message(message_et) {
     amplify.publish(z.event.WebApp.CONVERSATION.MESSAGE.ADDED, message_et);
     this._update_last_read_from_message(message_et);
-    this.messages_unordered.push(this._check_for_duplicate_nonce(message_et, this.get_last_message()));
+    message_et = this._check_for_duplicate(message_et, this.get_last_message());
+    if (message_et) {
+      this.messages_unordered.push(message_et);
+    }
   }
 
   /**
@@ -341,16 +344,14 @@ z.entity.Conversation = class Conversation {
    * @returns {undefined} No return value
    */
   add_messages(message_ets) {
-    let message_et;
-    for (let index = 0; index < message_ets.length; index++) {
-      message_et = message_ets[index];
-      message_et = this._check_for_duplicate_nonce(message_ets[index - 1], message_et);
-    }
+    message_ets = message_ets
+      .map((message_et, index) => this._check_for_duplicate(message_et, message_ets[index - 1]))
+      .filter((message_et) => message_et);
 
     // in order to avoid multiple db writes check the messages from the end and stop once
     // we found a message from self user
     for (let counter = message_ets.length - 1; counter >= 0; counter--) {
-      message_et = message_ets[counter];
+      const message_et = message_ets[counter];
       if (message_et.user() && message_et.user().is_me) {
         this._update_last_read_from_message(message_et);
         break;
@@ -367,12 +368,11 @@ z.entity.Conversation = class Conversation {
    */
   prepend_messages(message_ets) {
     const last_message_et = message_ets[message_ets.length - 1];
-    this._check_for_duplicate_nonce(last_message_et, this.get_first_message());
+    message_ets[message_ets.length - 1] = this._check_for_duplicate(last_message_et, this.get_first_message());
 
-    for (let index = message_ets.length - 1; index >= 0; index--) {
-      let message_et = message_ets[index];
-      message_et = this._check_for_duplicate_nonce(message_ets[index - 1], message_et);
-    }
+    message_ets = message_ets
+      .map((message_et, index) => this._check_for_duplicate(message_et, message_ets[index - 1]))
+      .filter((message_et) => message_et);
 
     z.util.ko_array_unshift_all(this.messages_unordered, message_ets);
   }
@@ -415,11 +415,17 @@ z.entity.Conversation = class Conversation {
    * @note If a message is send to the backend multiple times by a client they will be in the conversation multiple times
    * @param {z.entity.Message} message_et - Message entity to be added to the conversation
    * @param {z.entity.Message} other_message_et - Other message entity to compare with
-   * @returns {undefined} No return value
+   * @returns {z.entity.Message|undefined} Message if it is not a duplicate
    */
-  _check_for_duplicate_nonce(message_et, other_message_et) {
-    if ((message_et == null) || (other_message_et == null)) {
+  _check_for_duplicate(message_et, other_message_et) {
+    if (!message_et || !other_message_et) {
       return message_et;
+    }
+
+    for (const existing_message_et of this.messages_unordered()) {
+      if (existing_message_et.id === message_et.id) {
+        return undefined;
+      }
     }
 
     if (message_et.has_nonce() && other_message_et.has_nonce() && (message_et.nonce === other_message_et.nonce)) {
